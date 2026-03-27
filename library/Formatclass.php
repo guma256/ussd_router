@@ -57,6 +57,9 @@ class Formatclass {
             $xmln = $xml_post;
         }
 
+        libxml_use_internal_errors(true);
+        $xmln = trim($xmln);  
+        $xmln = preg_replace('/^\x{FEFF}/u', '', $xmln); 
         $xmlp = simplexml_load_string($xmln);
         $p_array = $this->ObjectToArray($xmlp);
 
