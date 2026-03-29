@@ -72,9 +72,8 @@ class Formatclass {
       }
     }
 
-    function ParseXMLRequest($xml_post, $level = false) {
-
-
+    function ParseXMLRequest($xml_post, $level = false)
+    {
         if ($level) {
             $doc = new DOMDocument();
             libxml_use_internal_errors(true);
@@ -84,23 +83,64 @@ class Formatclass {
         } else {
             $xmln = $xml_post;
         }
-
-        $unwanted_array = array('Š'=>'S', 'š'=>'s', 'Ž'=>'Z', 'ž'=>'z', 'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A', 'Æ'=>'A', 'Ç'=>'C', 'È'=>'E', 'É'=>'E',
-        'Ê'=>'E', 'Ë'=>'E', 'Ì'=>'I', 'Í'=>'I', 'Î'=>'I', 'Ï'=>'I', 'Ñ'=>'N', 'Ò'=>'O', 'Ó'=>'O', 'Ô'=>'O', 'Õ'=>'O', 'Ö'=>'O', 'Ø'=>'O', 'Ù'=>'U',
-        'Ú'=>'U', 'Û'=>'U', 'Ü'=>'U', 'Ý'=>'Y', 'Þ'=>'B', 'ß'=>'Ss', 'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'a', 'ç'=>'c','&'=>' n ',
-        'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e', 'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i', 'ð'=>'o', 'ñ'=>'n', 'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o',
-        'ö'=>'o', 'ø'=>'o', 'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ý'=>'y', 'þ'=>'b', 'ÿ'=>'y','Ğ'=>'G', 'İ'=>'I', 'Ş'=>'S', 'ğ'=>'g', 'ı'=>'i', 'ş'=>'s', 'ü'=>'u','ă'=>'a', 'Ă'=>'A', 'ș'=>'s', 'Ș'=>'S', 'ț'=>'t', 'Ț'=>'T');
-         $xmln = strtr($xmln, $unwanted_array);
+    
+        if ($xmln === null || $xmln === '') {
+            return false;
+        }
+ 
+        // Ensure string is valid UTF-8
+        if (!mb_check_encoding($xmln, 'UTF-8')) {
+            $xmln = mb_convert_encoding($xmln, 'UTF-8', 'UTF-8');
+        }
+    
+        // Remove characters not allowed in XML 1.0
+        $xmln = preg_replace(
+            '/[^\x09\x0A\x0D\x20-\x{D7FF}\x{E000}-\x{FFFD}]/u',
+            '',
+            $xmln
+        );
+    
+        // Escape stray ampersands that are not already valid XML entities
+        $xmln = preg_replace(
+            '/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9A-Fa-f]+;)/',
+            '&amp;',
+            $xmln
+        );
+        //error_log('RAW XML: ' . $xmln);
+        libxml_use_internal_errors(true);
         $xmlp = simplexml_load_string($xmln);
-        $p_array = $this->ObjectToArray($xmlp);
+    
+        if ($xmlp === false) {
+            foreach (libxml_get_errors() as $error) {
+               // error_log('XML Parse Error: ' . trim($error->message));
+            }
+            libxml_clear_errors();
+            return false;
+        }
+        //error_log('RAW XML after simplexml: ' . $xmln);
 
+        $unwanted_array = array('Š'=>'S', 'š'=>'s', 'Ž'=>'Z', 'ž'=>'z', 'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A', 'Æ'=>'A', 'Ç'=>'C', 'È'=>'E', 'É'=>'E', 'Ê'=>'E', 'Ë'=>'E', 'Ì'=>'I', 'Í'=>'I', 'Î'=>'I', 'Ï'=>'I', 'Ñ'=>'N', 'Ò'=>'O', 'Ó'=>'O', 'Ô'=>'O', 'Õ'=>'O', 'Ö'=>'O', 'Ø'=>'O', 'Ù'=>'U', 'Ú'=>'U', 'Û'=>'U', 'Ü'=>'U', 'Ý'=>'Y', 'Þ'=>'B', 'ß'=>'Ss', 'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'a', 'ç'=>'c','&'=>' n ', 'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e', 'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i', 'ð'=>'o', 'ñ'=>'n', 'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o', 'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ý'=>'y', 'þ'=>'b', 'ÿ'=>'y','Ğ'=>'G', 'İ'=>'I', 'Ş'=>'S', 'ğ'=>'g', 'ı'=>'i', 'ş'=>'s', 'ü'=>'u','ă'=>'a', 'Ă'=>'A', 'ș'=>'s', 'Ș'=>'S', 'ț'=>'t', 'Ț'=>'T' );
+    
+        // Normalize only subscriberInput after XML has been parsed
+        if (isset($xmlp->subscriberInput)) {
+            $subscriberInput = (string) $xmlp->subscriberInput;
+    
+            $subscriberInput = strtr($subscriberInput, $unwanted_array);
+    
+            // Remove any remaining control characters from subscriberInput
+            $subscriberInput = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $subscriberInput);
+    
+            // Optional: keep only commonly expected subscriber input characters
+            // Uncomment if you want stricter cleanup
+            // $subscriberInput = preg_replace('/[^A-Za-z0-9\s\*\#\+\&\(\)\'"\.\-]/u', '', $subscriberInput);
+    
+            $xmlp->subscriberInput = $subscriberInput;
+        }
+        $p_array = $this->ObjectToArray($xmlp);
         $request_array = $this->ArrayFlattener($p_array);
-         if(is_array($request_array)){
         $standard_array = $this->Standardize($request_array);
+    
         return $standard_array;
-       }else{
-        return $request_array;
-      }
     }
 
     function Standardize($data_array) {
