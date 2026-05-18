@@ -1,6 +1,6 @@
 <?php
 
-class RedisClass
+class Redisclass
 {
     private Redis $redis;
     private bool $connected = false;
@@ -24,39 +24,44 @@ class RedisClass
             }
 
             $this->connected = true;
+
         } catch (RedisException $e) {
             error_log('Redis connection failed: ' . $e->getMessage());
             throw $e;
         }
     }
 
-    public function deleteKey(string $key): int
+    public function DeleteKey(string $key): int
     {
         $this->connect();
+
         return $this->redis->del($key);
     }
 
-    public function keyExists(string $key): bool
+    public function KeyExists(string $key): bool
     {
         $this->connect();
+
         return (bool) $this->redis->exists($key);
     }
 
-    public function storeNameWithValue(string $key, string $name, mixed $value): int
+    public function StoreNameWitValue(string $key, string $name, mixed $value): int
     {
         $this->connect();
+
         return $this->redis->hSet($key, $name, $value);
     }
 
-    public function getKeyRecords(string $key): array
+    public function GetKeyRecords(string $key): array
     {
         $this->connect();
-        $records = $this->redis->hGetAll($key);
 
-        return is_array($records) ? $records : [];
+        $response = $this->redis->hGetAll($key);
+
+        return is_array($response) ? $response : [];
     }
 
-    public function storeArrayRecords(string $key, array $array, int $expiry = SESSION_ID_EXP): bool
+    public function StoreArrayRecords(string $key, array $array = [], int $expiry = SESSION_ID_EXP): bool
     {
         $this->connect();
 
@@ -73,7 +78,7 @@ class RedisClass
         return (bool) $saved;
     }
 
-    public function expireRecords(string $key, int $seconds = 190): bool
+    public function ExpireRecords(string $key, int $seconds = 190): bool
     {
         $this->connect();
 
@@ -84,13 +89,14 @@ class RedisClass
         return (bool) $this->redis->expire($key, $seconds);
     }
 
-    public function close(): bool
+    public function Close(): bool
     {
         if (!$this->connected) {
             return true;
         }
 
         $this->connected = false;
+
         return $this->redis->close();
     }
 }

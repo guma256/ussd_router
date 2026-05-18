@@ -1,120 +1,168 @@
 <?php
 
-class Model {
+class Model
+{
+    private Formatclass $format;
+    private Logs $log;
+    private Redisclass $redis;
 
-    function __construct() {
-
+    public function __construct()
+    {
         $this->format = new Formatclass();
         $this->log = new Logs();
-       $this->redis =  new Redisclass();
+        $this->redis = new Redisclass();
+
         Session::start();
     }
 
-    function SessionExists($req_params){
+    public function SessionExists(array $req_params): bool
+    {
+        if (empty($req_params['sessionId'])) {
+            return false;
+        }
 
-      return $this->redis->KeyExists($req_params['sessionId']);
+        return $this->redis->KeyExists($req_params['sessionId']);
     }
 
-    function GetSessionRecords($sessionId){
-      $route_data = $this->redis->GetKeyRecords($sessionId);
-   return $route_data;
+    public function GetSessionRecords(string $sessionId): array
+    {
+        if (empty($sessionId)) {
+            return [];
+        }
+
+        return $this->redis->GetKeyRecords($sessionId);
     }
 
-    function GetShortCodeData($shortode,$operator){
-           $route_data = $this->getOperatorRoute($shortode,$operator);
-     return $route_data;
+    public function GetShortCodeData(string $shortcode, string $operator): array|int
+    {
+        return $this->getOperatorRoute($shortcode, $operator);
     }
 
+    public function getOperatorRoute(string $shortcode, string $operator): array|int
+    {
+        foreach (SHORT_CODES as $value) {
+            if (
+                isset($value['shortcode']) &&
+                $value['shortcode'] == $shortcode &&
+                isset($value[$operator . '_url'])
+            ) {
+                return [
+                    'route_url' => $value[$operator . '_url'],
+                    'shortcode' => $value['shortcode']
+                ];
+            }
+        }
 
+        foreach (SHORT_CODES as $value) {
+            if (
+                isset($value['default']) &&
+                $value['default'] == 'yes' &&
+                isset($value[$operator . '_url'], $value['shortcode'])
+            ) {
+                return [
+                    'route_url' => $value[$operator . '_url'],
+                    'shortcode' => $value['shortcode']
+                ];
+            }
+        }
 
-    function  getOperatorRoute($shortode,$operator){
-        $shortode_data =  array();
-       foreach (SHORT_CODES as $key => $value) {
-         if($value['shortcode']==$shortode){
-           $shortode_data['route_url'] = $value[$operator.'_url'];
-           $shortode_data['shortcode'] = $value['shortcode'];
-        return $shortode_data ;
-         }
-       }
-            //Get Default
-       foreach (SHORT_CODES as $key => $value) {
-         if(isset($value['default'])=='yes'){
-           $shortode_data['route_url'] = $value[$operator.'_url'];
-           $shortode_data['shortcode'] = $value['shortcode'];
-        return $shortode_data;
-         }
-       }
-
-     return 0;
+        return 0;
     }
 
-    function SaveNewSession($data) {
-  //print_r($data);die();
-            //$postData['session_id'] = $data['sessionId'];
-            //$postData['session_date'] = date('Y-m-d H:i:s');
-            $postData['msisdn'] = $data['msisdn'];
-            $postData['url'] = $data['url'];
-            $postData['shortcode'] = $data['shortcode'];
-              //print_r($postData);die();
-            $this->redis->StoreArrayRecords($data['sessionId'], $postData);
+    public function SaveNewSession(array $data): bool
+    {
+        if (
+            empty($data['sessionId']) ||
+            empty($data['msisdn']) ||
+            empty($data['url']) ||
+            empty($data['shortcode'])
+        ) {
+            return false;
+        }
 
+        $postData = [
+            'msisdn'    => $data['msisdn'],
+            'url'       => $data['url'],
+            'shortcode' => $data['shortcode']
+        ];
+
+        return $this->redis->StoreArrayRecords($data['sessionId'], $postData);
     }
 
-    function ProcessCleanSession($req_params) {
+    public function ProcessCleanSession(array $req_params): bool
+    {
+        if (empty($req_params['sessionId'])) {
+            return false;
+        }
 
-      $this->redis->DeleteKey($req_params['sessionId']);
+        return $this->redis->DeleteKey($req_params['sessionId']) > 0;
     }
 
-    function WriteResponseXML($array) {
-        // create simpleXML object
-        $xml = new SimpleXMLElement("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><response></response>");
+    public function WriteResponseXML(array $array): string|bool
+    {
+        $xml = new SimpleXMLElement(
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><response></response>'
+        );
+
         $this->ArrayToXML($array, $xml);
+
         return $xml->asXML();
     }
 
-    function ArrayToXML($array, &$xml) {
+    private function ArrayToXML(array $array, SimpleXMLElement &$xml): void
+    {
         foreach ($array as $key => $value) {
+            $key = is_numeric($key) ? 'item' : $key;
+
             if (is_array($value)) {
-                if (!is_numeric($key)) {
-                    $subnode = $xml->addChild("$key");
-                    $this->ArrayToXML($value, $subnode);
-                } else {
-                    $this->ArrayToXML($value, $xml);
-                }
+                $subnode = $xml->addChild($key);
+                $this->ArrayToXML($value, $subnode);
             } else {
-              //  $xml->addChild("$key", "$value");
-                $xml->addChild("$key",htmlspecialchars($value));
-              //  $xml->$key = $value;
+                $xml->addChild($key, htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
             }
         }
     }
 
+    public function SendGetByCURL(string $url, array $req_params = [], array $extra_headers = []): string|bool
+    {
+        $this->log->ExeLog($req_params, 'Model::SendGetByCURL Sending To ' . $url, 2);
 
-    function SendGetByCURL($url,$req_params,$extra_headers=array()) {
+        $ch = curl_init();
 
-         $this->log->ExeLog($req_params,'Model::SendGetByCURL Sending  To ' . $url, 2);
-         $ch = curl_init();
-         if(!empty($extra_headers)){
-         curl_setopt($ch, CURLOPT_HTTPHEADER, $extra_headers);
-         }
-         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-         curl_setopt($ch, CURLOPT_URL, $url);
-         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        if ($ch === false) {
+            $this->log->ExeLog($req_params, 'Model::SendGetByCURL failed to initialize CURL', 2);
+            return false;
+        }
 
-         $content = curl_exec($ch);
-         if (!curl_errno($ch)) {
-             $info = curl_getinfo($ch);
-             $log = 'Took ' . $info['total_time'] . ' seconds to send a request to ' . $info['url'];
-         } else {
-             $log = 'Curl error: ' . curl_error($ch);
-         }
-        //$httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-         $this->log->ExeLog($req_params,'Model::SendGetByCURL Returning ' . $log, 2);
+        if (!empty($extra_headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $extra_headers);
+        }
 
- 	  $this->log->ExeLog($req_params,'Model::SendGetByCURL response content '. var_export($content, true), 2);
-         return $content;
-     }
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_URL            => $url,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
 
+        $content = curl_exec($ch);
+
+        if (curl_errno($ch)) {
+            $log = 'Curl error: ' . curl_error($ch);
+        } else {
+            $info = curl_getinfo($ch);
+            $log = 'Took ' . $info['total_time'] . ' seconds to send a request to ' . $info['url'];
+        }
+
+        curl_close($ch);
+
+        $this->log->ExeLog($req_params, 'Model::SendGetByCURL Returning ' . $log, 2);
+        $this->log->ExeLog($req_params, 'Model::SendGetByCURL response content ' . var_export($content, true), 2);
+
+        return $content;
+    }
 }
+
 ?>
