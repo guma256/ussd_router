@@ -2,6 +2,9 @@
 
 $conf = parse_ini_file("conf/config.ini",true);
 $routes = parse_ini_file("conf/shortcodes.ini",true);
+$logging = parse_ini_file("conf/logging.ini",true);
+
+define('APP_LOG'  ,$logging['application_log']);
 
 define('SHORT_CODES', $routes);
 define('MAINTENANCE', $conf['maintenance']['value']);

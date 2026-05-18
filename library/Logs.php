@@ -7,6 +7,7 @@ class Logs {
     }
 
     function LogXML($sp, $sv,$xml) {
+        if(strtolower(APP_LOG)=='trace'){
         $file_ext = microtime();
         $todays_folder = 'systemlog/xml_depo/'. date('Y_m_d');
         $sv_folder = $todays_folder.'/'.$sp;
@@ -18,8 +19,11 @@ class Logs {
         file_put_contents($file_name, $xml . "\n", FILE_APPEND | LOCK_EX);
         return $file_name;
     }
+    }
 
     function ExeLog($sa, $log, $id = false) {
+
+        if(strtolower(APP_LOG)=='trace'){
         $todays_folder = 'systemlog/tmp';
         $file_name = $todays_folder . '/ussd_router_log_' . date('Y_m_d') .'.txt';
 
@@ -33,6 +37,7 @@ class Logs {
         $this->PrepareLog($file_name, $full_log, $id);
 
         return $file_name;
+    }
     }
 
     function PrepareLog($file_name, $log, $level) {
