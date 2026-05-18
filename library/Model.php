@@ -2,9 +2,9 @@
 
 class Model
 {
-    private Formatclass $format;
-    private Logs $log;
-    private Redisclass $redis;
+    protected Formatclass $format;
+    protected Logs $log;
+    protected Redisclass $redis;
 
     public function __construct()
     {
@@ -109,7 +109,7 @@ class Model
         return $xml->asXML();
     }
 
-    private function ArrayToXML(array $array, SimpleXMLElement &$xml): void
+    public function ArrayToXML(array $array, SimpleXMLElement &$xml): void
     {
         foreach ($array as $key => $value) {
             $key = is_numeric($key) ? 'item' : $key;
